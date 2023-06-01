@@ -1,0 +1,401 @@
+---
+title: "Project"
+author: "Mariama Soumahoro"
+date: "3/8/2023"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r eval=TRUE, message=FALSE, warning=FALSE, , echo=TRUE}
+library("openxlsx")
+hearts <- read.xlsx("/Users/mariamasoumahoro/Desktop/2021 Data Analytics/Heart Data 2.xlsx")
+hearts
+sum(is.na(hearts)) # number of total missing values
+nrow(hearts) # sample size
+ncol(hearts) # number of columns
+str(hearts)
+summary(hearts)
+view(hearts)
+sapply(hearts,class)
+
+# Change some variables into categorical variables
+hearts$sex <- as.factor(hearts$sex)
+hearts$cp <- as.factor(hearts$cp)
+hearts$fbs <- as.factor(hearts$fbs)
+hearts$restecg <- as.factor(hearts$restecg)
+hearts$exang <- as.factor(hearts$exang)
+hearts$slope <- as.factor(hearts$slope)
+hearts$ca <- as.factor(hearts$ca)
+hearts$thal <- as.factor(hearts$thal)
+hearts$target <- as.factor(hearts$target)
+
+#Recheck for the categories of the covariates
+sapply(hearts,class)
+
+#Check the levels of each categorical variable
+
+levels(as.factor(hearts$sex))
+levels(as.factor(hearts$cp))
+levels(as.factor(hearts$fbs))
+levels(as.factor(hearts$restecg))
+levels(as.factor(hearts$exang))
+levels(as.factor(hearts$slope))
+levels(as.factor(hearts$ca))
+levels(as.factor(hearts$thal))
+levels(as.factor(hearts$target))
+
+```
+
+
+```{r , echo=TRUE,warning=FALSE,message=FALSE, eval=TRUE}
+#Data Visualization
+
+ggplot(hearts) + geom_bar(aes(x = sex))
+ggplot(hearts) + geom_bar(aes(x = cp))
+ggplot(hearts) + geom_bar(aes(x = fbs))
+ggplot(hearts) + geom_bar(aes(x = restecg))
+ggplot(hearts) + geom_bar(aes(x = exang))
+ggplot(hearts) + geom_bar(aes(x = slope))
+ggplot(hearts) + geom_bar(aes(x = ca))
+ggplot(hearts) + geom_bar(aes(x = thal))
+ggplot(hearts) + geom_bar(aes(x = target))
+
+library(ggplot2)
+library(GGally)
+pairs(~Age+trestbps+chol+thalach+oldpeak, data = hearts)
+par(mfrow=c(1,1))
+
+#Age vs. target and sex
+ggplot(hearts, aes(x = Age, y =target)) +
+  geom_point(aes(color = factor(sex)))
+
+#Age vs. trestbps and sex
+ggplot(hearts, aes(x = Age, y =trestbps)) +
+  geom_point(aes(color = factor(sex)))
+
+scatterplotMatrix(hearts[2:4])
+
+ggpairs(hearts, title="correlogram with ggpairs()")
+
+
+```
+
+    ** Methods**
+         
+         ***1- Logistic Regression
+
+```{r , echo=TRUE,warning=FALSE,message=FALSE, eval=TRUE}
+## divide the data into training and test sets
+set.seed(12345)
+ind <- sample(2, nrow(hearts),
+ replace = TRUE,
+prob = c(0.8, 0.2))
+train <- hearts[ind==1,]
+test <- hearts[ind==2,]
+```
+
+    
+      #Logistic regression
+
+```{r , echo=TRUE,warning=FALSE,message=FALSE, eval=TRUE}
+
+my.logit <- glm(target~. ,data = train, family = "binomial") 
+Step.heart<-step(my.logit,direction="both")
+summary(Step.heart) #AIC=163.24
+
+my.logit.1 <- glm(target~sex+cp+exang+oldpeak+slope+ca+thal ,data = train, family = "binomial")
+summary(my.logit.1)
+
+#Model validation:
+ #Confusion matrix for training
+LR.train.3 <- predict(my.logit.1 ,train,type="response") 
+summary(LR.train.3)
+LR.pred.train.4 <- ifelse (LR.train.3 > 0.5, 1,0)
+LR.table.train.4 <- table(train$target,LR.pred.train.4) 
+LR.table.train.4
+sum(diag(LR.table.train.4))/sum(LR.table.train.4)#0.8836
+  #Misclassification rate:error rate
+1-sum(diag(LR.table.train.4))/sum(LR.table.train.4) #0.1164
+
+
+# Remove variable with the highest p-values that is not important
+   #Remove variable: thal
+Logit.heart <```````````````- glm(target~ sex+cp+exang+oldpeak+slope+ca, data = train, family = "binomial")
+summary(Logit.heart) #175.38
+
+Step.Logit.heart<-step(Logit.heart,direction="both")
+summary(Step.Logit.heart)#175.38
+
+#remove slope
+Logit.heart.2 <- glm(target~ sex+cp+exang+oldpeak+ca, data = train, family = "binomial")
+summary(Logit.heart.2) #AIC:184.79
+# the AIC is greater with this model although all the variables are important
+
+#Model validation:
+ #Confusion matrix for training
+LR.train.4 <- predict(Logit.heart.2 ,train,type="response") 
+summary(LR.train.4)
+LR.pred.train.5 <- ifelse (LR.train.4 > 0.5, 1,0)
+LR.table.train.5 <- table(train$target,LR.pred.train.5) 
+LR.table.train.5
+sum(diag(LR.table.train.5))/sum(LR.table.train.5)#0.8405
+  #Misclassification rate:error rate
+1-sum(diag(LR.table.train.5))/sum(LR.table.train.5) #0.159
+
+
+#remove slope and put back thal
+Logit.heart.3 <- glm(target~ sex+cp+exang+oldpeak+ca+thal, data = train, family = "binomial")
+summary(Logit.heart.3) # AIC=171.12
+
+#THE BEST MODEL: (the one without thal)
+Logit.heart.4 <- glm(target~ sex+cp+exang+oldpeak+slope+ca+thal, data = train, family = "binomial")
+summary(Logit.heart.4) #AIC=163.24
+
+##Plot the residual plot with all predictors.
+attach(train)
+require(gridExtra)
+
+plot1 = ggplot(train, aes(sex, residuals(Logit.heart.4))) + geom_point() + geom_smooth()
+
+plot2=ggplot(train, aes(cp, residuals(Logit.heart.4))) + geom_point() + geom_smooth()
+plot3=ggplot(train, aes(exang, residuals(Logit.heart.4))) + geom_point() + geom_smooth()
+plot4=ggplot(train, aes(oldpeak, residuals(Logit.heart.4))) + geom_point() + geom_smooth()
+plot5=ggplot(train, aes(slope, residuals(Logit.heart.4))) + geom_point() + geom_smooth()
+plot6=ggplot(train, aes(ca, residuals(Logit.heart.4))) + geom_point() + geom_smooth()
+plot7=ggplot(train, aes(thal, residuals(Logit.heart.4))) + geom_point() + geom_smooth()
+
+grid.arrange(plot1,plot2,plot3,plot4,plot5,plot6,plot7,ncol=5,nrow=2)
+
+
+#Model validation:
+ #Confusion matrix for training
+LR.pred.prob.train <- predict(Logit.heart.4,train,type="response") 
+summary(LR.pred.prob.train)
+LR.pred.train <- ifelse (LR.pred.prob.train > 0.5, 1,0)
+LR.table.train <- table(train$target,LR.pred.train) 
+LR.table.train
+sum(diag(LR.table.train))/sum(LR.table.train) #0.8837
+#Misclassification rate:error rate
+1-sum(diag(LR.table.train))/sum(LR.table.train)#0.1163
+
+   #Confusion matrix for test data
+LR.pred.prob <- predict(Logit.heart.4,test,type="response") 
+summary(LR.pred.prob)
+LR.pred <- ifelse (LR.pred.prob > 0.5, 1,0)
+LR.table <- table(test$target,LR.pred) 
+LR.table
+sum(diag(LR.table))/sum(LR.table) #0.859
+
+TestErrorRate <- (LR.table[1,2]+LR.table[2,1])/sum(LR.table) 
+TestErrorRate
+
+Sensitivity <- (LR.table[2,2]/(LR.table[2,1]+LR.table[2,2])) 
+Sensitivity
+
+Specificity <- (LR.table[1,1]/sum(LR.table[1,])) 
+Specificity
+    
+     #Misclassification rate:error rate
+1-sum((diag(LR.table))/sum(LR.table)) #0.14
+
+
+# plot for the ROC curve
+
+library(pROC)
+LR.roc <- roc(test$target, LR.pred.prob,legacy.axes=TRUE) 
+ggroc(LR.roc)
+
+#we find the area under the ROC
+auc(LR.roc) #0.872
+
+## CIs using standard errors
+confint.default(Found_model.2)
+
+#We can test for an overall effect of rank using the wald.test function of the aod library.
+
+library(aod)
+wald.test(b = coef(Found_model.2), Sigma = vcov(Found_model.2), Terms = 7) #Texture_se does not really contribute to the model
+
+## odds ratios only
+exp(coef(Found_model.2))
+
+## odds ratios and 95% CI
+exp(cbind(OR = coef(Found_model.2), confint(Found_model.2)))
+
+```
+
+      2-** DA Method**
+```{r eval=TRUE, message=FALSE, warning=FALSE, , echo=TRUE}
+
+## LDA method
+
+#install.packages("psych")
+library(psych)
+
+# Lets visualize the relationships variables have taken two at time
+#  by making scatter plots and correlations in upper triangle
+# pch=21 is the symbol sign
+pairs.panels(hearts[1:4], gap = 0,
+bg = c("red", "green", "blue")[hearts$target], pch = 21)
+
+# Linear discriminant analysis
+  #Check distribution of each varaible
+##Explore the data.
+ggplot(train, aes(target)) + geom_density(fill="blue")
+
+ggplot(train, aes(Age)) + geom_density(fill="blue") #normal
+
+ggplot(train, aes(sex)) + geom_density(fill="blue") #normal
+ggplot(train, aes(log(sex))) + geom_density(fill="blue")
+ggplot(train, aes(sqrt(sex))) + geom_density(fill="blue")
+
+ggplot(train, aes(cp)) + geom_density(fill="blue") #normal
+
+ggplot(train, aes(trestbps)) + geom_density(fill="blue")
+ggplot(train, aes(log(trestbps))) + geom_density(fill="blue")#Use log
+ggplot(train, aes(sqrt(trestbps))) + geom_density(fill="blue")
+
+ggplot(train, aes(chol)) + geom_density(fill="blue")
+ggplot(train, aes(log(chol))) + geom_density(fill="blue")#Use log
+ggplot(train, aes(sqrt(chol))) + geom_density(fill="blue")
+
+ggplot(train, aes(fbs)) + geom_density(fill="blue") #normal
+
+ggplot(train, aes(restecg)) + geom_density(fill="blue") #normal
+
+ggplot(train, aes(thalach)) + geom_density(fill="blue") 
+ggplot(train, aes(log(thalach))) + geom_density(fill="blue")
+ggplot(train, aes(sqrt(thalach))) + geom_density(fill="blue")
+#not normal, use box cox method
+
+ggplot(train, aes(exang)) + geom_density(fill="blue")
+ggplot(train, aes(log(exang))) + geom_density(fill="blue")
+ggplot(train, aes(sqrt(exang))) + geom_density(fill="blue")
+#not normal, use box cox method
+
+ggplot(train, aes(oldpeak)) + geom_density(fill="blue")
+ggplot(train, aes(log(oldpeak))) + geom_density(fill="blue") #use log
+ggplot(train, aes(sqrt(oldpeak))) + geom_density(fill="blue")
+
+ggplot(train, aes(slope)) + geom_density(fill="blue") #normal
+
+ggplot(train, aes(ca)) + geom_density(fill="blue") #normal
+
+ggplot(train, aes(thal)) + geom_density(fill="blue") #normal
+
+
+
+ #Normalize the data
+# Estimate preprocessing parameters
+preproc.param <- train %>% 
+  preProcess(method = c("center", "scale"))
+# Transform the data using the estimated parameters
+train.transformed <- preproc.param %>% predict(train)
+test.transformed <- preproc.param %>% predict(test)
+
+# install.packages("MASS")
+library(MASS)
+heart.linear <- lda(target~., train.transformed )
+heart.linear
+
+attributes(heart.linear) #  see what attributes are there we can print: like
+heart.linear$prior # this will give prior percentages of each type in training data
+
+predictions <- heart.linear %>% predict(test.transformed)
+names(predictions)
+
+# Predicted classes
+head(predictions$class, 6)
+# Predicted probabilities of class memebership.
+head(predictions$posterior, 6) 
+# Linear discriminants
+head(predictions$x, 3) 
+
+mean(predictions$class==test.transformed$target) #the model correctly classified 86% of observations
+mean(predictions$class==train.transformed$target)
+
+#--- plotting the density plot --- #
+p<- predict(heart.linear,train.transformed)
+p.df <- data.frame(LD1 = p$x, class = p$class) #--- converting the prediction to data.frame
+print(p.df)
+library(ggplot2)
+ggplot(p.df) + geom_density(aes(LD1, fill = class), alpha = 0.2)
+
+# Confusion matrix and accuracy - training data
+p1 <- predict(heart.linear, train.transformed)$class # Our LDA model was stored as linear ; extract class
+tab <- table(Predicted = p1, Actual = train.transformed$target)
+tab
+sum(diag(tab))/sum(tab)
+
+# Confusion matrix and accuracy - testing data
+p2 <- predict(heart.linear, test.transformed)$class
+tab1 <- table(Predicted = p2, Actual = test.transformed$target)
+tab1
+sum(diag(tab1))/sum(tab1) #0.859
+
+#Misclassification rate
+1-sum(diag(tab1))/sum(tab1)#0.1408
+```
+
+  
+
+```{r eval=TRUE, message=FALSE, warning=FALSE, , echo=TRUE}
+
+  # FITTING QDA
+library(tidyverse)
+library(caret)
+
+model <- qda(target~., data = train.transformed)
+model
+# Make predictions
+predictions.qda <- model %>% predict(test.transformed)
+# Model accuracy
+mean(predictions.qda$class == test$target)
+
+# Confusion matrix and accuracy - training data
+p3 <- predict(model, train.transformed)$class
+tab2 <- table(Predicted = p3, Actual = train.transformed$target)
+tab2
+sum(diag(tab2))/sum(tab2) #0.87
+#Misclassification rate
+1-sum(diag(tab2))/sum(tab2)#0.129
+
+# Confusion matrix and accuracy - testing data
+p4 <- predict(model, test.transformed)$class
+tab3 <- table(Predicted = p4, Actual = test.transformed$target)
+tab3
+sum(diag(tab3))/sum(tab3) #0.8028
+1-sum(diag(tab3))/sum(tab3)#0.197
+
+```
+
+# Histogram
+p <- predict(LDA.1, train.transform)
+p # this has posterior probabilities of each observation to be of
+# every type, also gives scaleings of LD1 and LD2 based on the lin. comb.
+
+ldahist(data = p$x[,2], g = train.transform$Diagnosis) # Histogram of LD1 not working
+
+# Bi-Plot
+# install.packages("devtools")
+library(devtools)
+# install_github("fawda123/ggord")
+
+library(ggord)
+ggord(LDA.1, train.transform$Diagnosis, ylim = c(-10, 10))
+# Above gives two dimensional plot, not working
+
+# Partition plot
+# install.packages("klaR")
+library(klaR)
+partimat(factor(Diagnosis)~., data = train.transform, method = "lda")
+# you can visualize the LDA lines for each pair of variable combination, not working 
+
+
+partimat(factor(Diagnosis)~., data = train.transform, method = "qda")
+# same as above but with Quadratic Discriminant Analysis
+# Note the lines are now Curves, not working
+
